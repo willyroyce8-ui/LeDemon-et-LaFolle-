@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Atirma - Univers Final</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050515; }
+        canvas { display: block; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 20000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.maxDistance = 6000; 
+        camera.position.set(0, 800, 2000);
+
+        // --- 1. FOND NÉBULEUSE PROFOND ---
+        function createDeepSpace() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(1024, 512, 0, 1024, 512, 1024);
+            grad.addColorStop(0, '#1a1040'); grad.addColorStop(1, '#050510');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 2048, 1024);
+            for(let i = 0; i < 75; i++) {
+                const x = Math.random() * 2048, y = Math.random() * 1024, r = 50 + Math.random() * 350;
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                const color = i % 2 === 0 ? '138, 43, 226' : '210, 50, 120';
+                g.addColorStop(0, `rgba(${color}, 0.18)`); g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            const skyGeo = new THREE.SphereGeometry(9000, 32, 32);
+            scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })));
+        }
+        createDeepSpace();
+
+        // --- 2. ÉTOILES ET CŒURS (PETITE TAILLE) ---
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(25000 * 3);
+        for(let i=0; i < 75000; i++) { starPos[i] = (Math.random() - 0.5) * 8000; }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, transparent: true, blending: THREE.AdditiveBlending });
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        function createHeart() {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const x = c.getContext('2d'); x.fillStyle = "white"; x.beginPath();
+            x.moveTo(32, 48); x.bezierCurveTo(32, 48, 12, 36, 12, 22); x.bezierCurveTo(12, 8, 28, 8, 32, 18);
+            x.bezierCurveTo(36, 8, 52, 8, 52, 22); x.bezierCurveTo(52, 36, 32, 48, 32, 48); x.fill();
+            return new THREE.CanvasTexture(c);
+        }
+        const heartMat = new THREE.PointsMaterial({ map: createHeart(), color: 0xff3344, size: 20, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+        const heartGeo = new THREE.BufferGeometry();
+        const heartPos = new Float32Array(8000 * 3);
+        for(let i=0; i < 24000; i++) { heartPos[i] = (Math.random() - 0.5) * 8000; }
+        heartGeo.setAttribute('position', new THREE.BufferAttribute(heartPos, 3));
+        scene.add(new THREE.Points(heartGeo, heartMat));
+
+        // --- 3. MOTS DOUX (TAILLE AUGMENTÉE) ---
+        const words = ["je t'aime", "princesse", "petit pois", "ma folle", "ma reine"];
+        const wordSprites = [];
+        function createTextTexture(text) {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = "white"; ctx.textAlign = "center";
+            ctx.font = "bold 50px 'Georgia', serif"; ctx.fillText(text, 256, 80);
+            return new THREE.CanvasTexture(canvas);
+        }
+        for(let i = 0; i < 150; i++) {
+            const mat = new THREE.SpriteMaterial({ map: createTextTexture(words[i % words.length]), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+            const sprite = new THREE.Sprite(mat);
+            const dist = 2500 + Math.random() * 3000;
+            const angle = Math.random() * Math.PI * 2;
+            sprite.position.set(Math.cos(angle) * dist, (Math.random() - 0.5) * 3000, Math.sin(angle) * dist);
+            sprite.scale.set(300, 75, 1); // Taille augmentée (précédemment 160x40)
+            scene.add(sprite);
+            wordSprites.push(sprite);
+        }
+
+        // --- 4. SOLEIL ET TEXTE CENTRAL ---
+        function createSunTex() {
+            const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+            const x = c.getContext('2d');
+            const g = x.createRadialGradient(256, 128, 0, 256, 128, 256);
+            g.addColorStop(0, '#fff'); g.addColorStop(0.4, '#ffcc00'); g.addColorStop(1, '#ff4500');
+            x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+            x.fillStyle = "white"; x.textAlign = "center"; x.font = "bold 60px serif";
+            x.fillText("Atirma", 256, 150);
+            return new THREE.CanvasTexture(c);
+        }
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(75, 64, 64), new THREE.MeshBasicMaterial({ map: createSunTex() }));
+        scene.add(sun);
+        const lCanvas = document.createElement('canvas'); lCanvas.width = 1024; lCanvas.height = 256;
+        const lCtx = lCanvas.getContext('2d');
+        lCtx.fillStyle = "white"; lCtx.textAlign = "center"; lCtx.font = "bold 55px Georgia";
+        lCtx.shadowBlur = 20; lCtx.shadowColor = "white";
+        lCtx.fillText("Le centre de mon univers", 512, 128);
+        const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lCanvas), transparent: true, blending: THREE.AdditiveBlending }));
+        labelSprite.scale.set(400, 100, 1); labelSprite.position.y = 140; sun.add(labelSprite);
+
+        // --- 5. COMÈTES ---
+        const comets = [];
+        function createComet() {
+            const group = new THREE.Group();
+            group.add(new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x88ffff })));
+            const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 3, 100, 12), new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.5 }));
+            tail.position.y = -50; group.add(tail);
+            group.position.set((Math.random()-0.5)*8000, (Math.random()-0.5)*3000, (Math.random()-0.5)*8000);
+            group.lookAt(0,0,0); group.rotateX(Math.PI/2);
+            scene.add(group);
+            comets.push({ mesh: group, speed: 10 + Math.random()*15 });
+        }
+        setInterval(createComet, 4000);
+
+        // --- 6. PLANÈTES ET ORBITES JAUNES ---
+        const planets = []; const orbits = [];
+        const config = [
+            { d: 250, s: 15, c: 0xaaaaaa, sp: 0.018 },
+            { d: 400, s: 25, c: 0xffddaa, sp: 0.014 },
+            { d: 600, s: 28, c: 0x2288ff, sp: 0.011 },
+            { d: 850, s: 22, c: 0xff5522, sp: 0.009 },
+            { d: 1200, s: 65, c: 0xffbb88, sp: 0.006 },
+            { d: 1600, s: 55, c: 0xeeddbb, sp: 0.004, ring: true },
+            { d: 2000, s: 35, c: 0x88ffff, sp: 0.003 },
+            { d: 2400, s: 35, c: 0x3355ff, sp: 0.002 }
+        ];
+        config.forEach(p => {
+            const pivot = new THREE.Group(); scene.add(pivot);
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.s, 32, 32), new THREE.MeshStandardMaterial({ color: p.c, roughness: 0.6 }));
+            mesh.position.x = p.d; pivot.add(mesh);
+            if (p.ring) {
+                const ringGeo = new THREE.TorusGeometry(p.s * 1.8, 4, 2, 100);
+                const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 }));
+                ring.rotation.x = Math.PI / 2; mesh.add(ring);
+            }
+            const oMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, opacity: 0.7, transparent: true, blending: THREE.AdditiveBlending });
+            const orbit = new THREE.Mesh(new THREE.TorusGeometry(p.d, 2.0, 16, 100), oMat);
+            orbit.rotation.x = Math.PI / 2; scene.add(orbit);
+            planets.push({ pivot, speed: p.sp }); orbits.push(oMat);
+        });
+
+        scene.add(new THREE.PointLight(0xffffff, 3.5, 6000));
+        scene.add(new THREE.AmbientLight(0x606060));
+
+        // --- ANIMATION ---
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+            sun.rotation.y += 0.003;
+            planets.forEach(p => p.pivot.rotation.y += p.speed * 0.4);
+            orbits.forEach((o, i) => o.opacity = 0.5 + Math.sin(time * 3 + i) * 0.2);
+            wordSprites.forEach((s, i) => s.material.color.setHSL((time * 0.2 + i * 0.1) % 1, 0.8, 0.7));
+            starMat.opacity = 0.5 + Math.random() * 0.5;
+            heartMat.opacity = 0.6 + Math.random() * 0.4;
+            comets.forEach((c, index) => {
+                c.mesh.translateY(c.speed);
+                if(c.mesh.position.length() > 10000) { scene.remove(c.mesh); comets.splice(index, 1); }
+            });
+            controls.update(); renderer.render(scene, camera);
+        }
+        animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    </script>
+</body>
+</html>
